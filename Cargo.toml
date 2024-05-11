@@ -6,5 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+log = "0.4.21"
+quick-xml = { version = "0.31.0", features = ["serialize", "overlapped-lists"] }
+serde = { version = "1.0.201", features = ["derive"] }
 thiserror = "1.0.60"
 zip = {version = "1.2.2", default-features = false, features = ["deflate", "deflate64"] }

@@ -1,16 +1,22 @@
-mod util;
+use std::path::Path;
+
+use toc::TableOfContent;
+
+pub(crate) mod container;
+pub(crate) mod opf;
+pub(crate) mod toc;
+mod epub;
 pub mod error;
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Epub book
+pub trait Epub {
+    
+    // The book's title
+    fn title() -> String;
+    
+    // The book's cover image
+    fn cover() -> Path;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+    // The book's table of content
+    fn toc() -> TableOfContent;
 }
