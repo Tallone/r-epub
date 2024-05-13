@@ -1,18 +1,17 @@
 use std::path::PathBuf;
 
-pub use crate::epub::EpubContainer; 
+pub use crate::epub::EpubContainer;
 
 pub(crate) mod chapter;
 pub(crate) mod container;
 mod epub;
-pub mod result;
 pub(crate) mod opf;
+pub mod result;
 pub(crate) mod toc;
 pub(crate) mod types;
 
 /// Epub book
 pub trait Epub {
-
     // The book's title
     fn title(&self) -> String;
 

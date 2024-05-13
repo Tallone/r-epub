@@ -112,7 +112,8 @@ impl Epub for EpubContainer {
             if let Some(item) = items.get(index - 1) {
                 let id = &item.id_ref;
                 if let Some(manifest) = self.opf.get_item(id) {
-                    let item_path = get_abs_path(&self.opf_path, &Path::new(&manifest.href).to_path_buf());
+                    let item_path =
+                        get_abs_path(&self.opf_path, &Path::new(&manifest.href).to_path_buf());
                     let chapter = Chapter::parse(
                         index,
                         &folder.to_string_lossy(),

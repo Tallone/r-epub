@@ -106,10 +106,14 @@ pub struct Reference {
 }
 
 impl Opf {
-
     pub fn toc_path(&self) -> String {
         let toc_id = &self.spine.toc;
-        let toc_metadata = self.manifest.items.iter().find(|i| i.id.eq(toc_id)).unwrap();
+        let toc_metadata = self
+            .manifest
+            .items
+            .iter()
+            .find(|i| i.id.eq(toc_id))
+            .unwrap();
         toc_metadata.href.clone()
     }
 
@@ -126,7 +130,7 @@ impl Opf {
 
     /// Get item by id
     pub fn get_item(&self, id: &str) -> Option<&Item> {
-        if let Some(item) = self.manifest.items.iter().find(|i| i.id == id ) {
+        if let Some(item) = self.manifest.items.iter().find(|i| i.id == id) {
             return Some(item);
         }
 
