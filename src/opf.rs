@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::types;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Opf {
@@ -26,7 +28,7 @@ pub struct Metadata {
     #[serde(rename = "identifier", default)]
     pub identifiers: Vec<Identifier>,
     #[serde(rename = "meta", default)]
-    pub metas: Vec<Meta>,
+    pub metas: Vec<types::Meta>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -55,14 +57,6 @@ pub struct Identifier {
     pub value: String,
     #[serde(rename = "@id", default)]
     pub id: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct Meta {
-    #[serde(rename = "@name")]
-    pub name: String,
-    #[serde(rename = "@content")]
-    pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -117,5 +111,16 @@ impl Opf {
         let toc_id = &self.spine.toc;
         let toc_metadata = self.manifest.items.iter().find(|i| i.id.eq(toc_id)).unwrap();
         toc_metadata.href.clone()
+    }
+
+    /// Get the book's cover href.
+    pub fn cover_path(&self) -> Option<String> {
+        if let Some(first) = self.manifest.items.get(0) {
+            if first.media_type.contains("image") {
+                return Some(first.href.clone());
+            }
+        }
+
+        None
     }
 }

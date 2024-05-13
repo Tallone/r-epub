@@ -1,10 +1,7 @@
-use std::path::Path;
-
-use toc::TableOfContent;
-
 pub(crate) mod container;
 pub(crate) mod opf;
 pub(crate) mod toc;
+pub(crate) mod types;
 mod epub;
 pub mod error;
 
@@ -12,11 +9,11 @@ pub mod error;
 pub trait Epub {
     
     // The book's title
-    fn title() -> String;
+    fn title(&self) -> String;
     
     // The book's cover image
-    fn cover() -> Path;
+    fn cover(&self) -> Option<String>;
 
     // The book's table of content
-    fn toc() -> TableOfContent;
+    fn toc(&self) -> &toc::Toc;
 }

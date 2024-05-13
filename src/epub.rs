@@ -1,25 +1,19 @@
-use std::{
-    io::{BufReader, Read},
-    path::Path,
-};
+use std::{fs::{self, File}, io::{self, BufReader}, path::{Path, PathBuf}};
 
-use zip::read::ZipFile;
+use zip::ZipArchive;
 
-use crate::{
-    container::Container,
-    error::Result,
-    opf::{self, Opf},
-    toc::TableOfContent,
-};
+use crate::{container::Container, error::Result, opf, toc, Epub};
 
 const ENTRY_FILE: &str = "META-INF/container.xml";
 
 pub struct EpubContainer {
-    pub opf: Opf,
+    pub opf: opf::Opf,
+    pub toc: toc::Toc,
 }
 
 impl EpubContainer {
-    pub fn parse<P: AsRef<Path>>(path: P) -> Result<EpubContainer> {
+    /// Parse epub info and if pass extract_path, will extract all files from epub to the path
+    pub fn parse<P: AsRef<Path>>(path: P, extract_path: Option<P>) -> Result<EpubContainer> {
         let file = std::fs::File::open(path)?;
         // Unzip epub
         let mut archive = zip::ZipArchive::new(file)?;
@@ -34,68 +28,102 @@ impl EpubContainer {
         // Parse toc
         let toc_path = opf.toc_path();
         let toc_file = archive.by_name(&toc_path)?;
-        Self::parse_toc(toc_file);
+        let toc: toc::Toc = quick_xml::de::from_reader(BufReader::new(toc_file))?;
 
-        Ok(Self { opf })
+        // extract
+        if let Some(dest_path) = extract_path {
+            Self::extract(&mut archive, dest_path);
+        }
+
+        Ok(Self { opf, toc })
     }
 
-    fn parse_toc(file: ZipFile) {
-        let mut reader = quick_xml::Reader::from_reader(BufReader::new(file));
-        reader.trim_text(true);
-        reader.expand_empty_elements(true);
+    fn extract<P: AsRef<Path>>(archive: &mut ZipArchive<File>, path: P) {
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).unwrap();
+            let outpath = path.as_ref().to_path_buf();
 
-        let mut toc = TableOfContent::default();
+            {
+                let comment = file.comment();
+                if !comment.is_empty() {
+                    println!("File {i} comment: {comment}");
+                }
+            }
 
-        let mut count = 0;
-        // let mut txt = Vec::new();
-        let mut buf = Vec::new();
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-                // exits the loop when reaching end of file
-                Ok(quick_xml::events::Event::Eof) => break,
-
-                Ok(quick_xml::events::Event::Start(e)) => {
-                    let bytes = e.name().0;
-                    let tag = String::from_utf8(bytes.to_vec()).unwrap();
-                    // println!("tag: {tag}");
-                    match bytes {
-                        b"meta" => {
-                            
-                            let span = reader.read_to_end_into(e.to_end().name(), &mut buf).unwrap();
-                        }
-                        _ => (),
+            if file.is_dir() {
+                fs::create_dir_all(&outpath).unwrap();
+            } else {
+                if let Some(p) = outpath.parent() {
+                    if !p.exists() {
+                        fs::create_dir_all(p).unwrap();
                     }
                 }
-                Ok(quick_xml::events::Event::Text(e)) => {
-                    // println!("text: {}", e.unescape().unwrap());
-                    // txt.push(e.unescape().unwrap().into_owned())
-                }
-
-                // There are several other `Event`s we do not consider here
-                _ => (),
+                let mut outfile = fs::File::create(&outpath).unwrap();
+                io::copy(&mut file, &mut outfile).unwrap();
             }
-            // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
-            buf.clear();
+
+            // Get and Set permissions
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+
+                if let Some(mode) = file.unix_mode() {
+                    fs::set_permissions(&outpath, fs::Permissions::from_mode(mode)).unwrap();
+                }
+            }
         }
+    }
+}
+
+impl Epub for EpubContainer {
+    fn title(&self) -> String {
+        self.opf.metadata.title.clone()
+    }
+
+    fn cover(&self) -> Option<String> {
+        self.opf.cover_path()
+    }
+
+    fn toc(&self) -> &toc::Toc {
+        &self.toc
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, BufReader, Cursor, Read};
 
-    use log::info;
-
-    use crate::{container::Container, opf};
+    use self::toc::{NavMap, NavPoint};
 
     use super::*;
 
+    fn print_nav_map(nav_map: &NavMap, depth: usize) {
+        let indent = " ".repeat(depth * 4);
+        for nav_point in &nav_map.nav_points {
+            print_nav_point(nav_point, &indent);
+        }
+    }
+
+    fn print_nav_point(nav_point: &NavPoint, indent: &str) {
+        println!("{}NavPoint {{", indent);
+        println!(
+            "{}    nav_lable: \"{}\",",
+            indent, nav_point.nav_lable.text.text
+        ); // assuming NavLabel has its own Debug implementation
+        if !nav_point.sub_navpoints.is_empty() {
+            println!("{}    sub_navpoints: [", indent);
+            for sub_navpoint in &nav_point.sub_navpoints {
+                print_nav_point(sub_navpoint, &format!("{}    ", indent));
+            }
+            println!("{}    ],", indent);
+        }
+        println!("{}}},", indent);
+    }
+
     #[test]
-    fn parse_opf() {
+    fn parse() {
         let path = "demo.epub";
-        let epub = EpubContainer::parse(path).unwrap();
-        println!("opf: {}", epub.opf.metadata.title);
+        let epub = EpubContainer::parse(path, None).unwrap();
+
+        print_nav_map(&epub.toc.nav_map, epub.toc.depth());
     }
 }
