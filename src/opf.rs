@@ -123,4 +123,13 @@ impl Opf {
 
         None
     }
+
+    /// Get item by id
+    pub fn get_item(&self, id: &str) -> Option<&Item> {
+        if let Some(item) = self.manifest.items.iter().find(|i| &i.id == id ) {
+            return Some(item);
+        }
+
+        None
+    }
 }
