@@ -8,7 +8,6 @@ import sys
 
 _STDIO = pathlib.Path("-")
 
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=pathlib.Path, default="CHANGELOG.md")
