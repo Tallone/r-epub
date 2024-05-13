@@ -6,15 +6,15 @@ use std::{
 
 use zip::ZipArchive;
 
-use crate::{chapter::Chapter, container::Container, error::Result, opf, toc, Epub};
+use crate::{chapter::Chapter, container::Container, opf, result::Result, toc, Epub};
 
 const ENTRY_FILE: &str = "META-INF/container.xml";
 
 pub struct EpubContainer {
     folder: Option<PathBuf>,
     opf_path: PathBuf,
-    pub opf: opf::Opf,
-    pub toc: toc::Toc,
+    opf: opf::Opf,
+    toc: toc::Toc,
 }
 
 impl EpubContainer {
@@ -95,8 +95,10 @@ impl Epub for EpubContainer {
         self.opf.metadata.title.clone()
     }
 
-    fn cover(&self) -> Option<String> {
-        self.opf.cover_path()
+    fn cover(&self) -> Option<PathBuf> {
+        self.opf
+            .cover_path()
+            .map(|p| get_abs_path(&self.opf_path, &Path::new(&p).to_path_buf()))
     }
 
     fn toc(&self) -> &toc::Toc {
@@ -110,9 +112,12 @@ impl Epub for EpubContainer {
             if let Some(item) = items.get(index - 1) {
                 let id = &item.id_ref;
                 if let Some(manifest) = self.opf.get_item(id) {
-                    let item_path = get_abs_path(&self.opf_path.to_string_lossy(), &manifest.href);
-                    let fs_path = folder.join(item_path);
-                    let chapter = Chapter::parse(index, &fs_path.to_string_lossy());
+                    let item_path = get_abs_path(&self.opf_path, &Path::new(&manifest.href).to_path_buf());
+                    let chapter = Chapter::parse(
+                        index,
+                        &folder.to_string_lossy(),
+                        &item_path.to_string_lossy(),
+                    );
                     return chapter.ok();
                 }
             }
@@ -125,8 +130,9 @@ impl Epub for EpubContainer {
 /// This method will return path relative to epub root path
 ///
 /// Item href in content.opf is relative to the file self, we should convert it to relative to root
-fn get_abs_path(opf_path: &str, item_href: &str) -> PathBuf {
-    let opf_path = Path::new(opf_path);
+fn get_abs_path<P: AsRef<Path>>(opf_path: P, item_href: P) -> PathBuf {
+    let opf_path = opf_path.as_ref();
+    let item_href = item_href.as_ref();
     let path_buf = if let Some(parent) = opf_path.parent() {
         parent.join(item_href)
     } else {
@@ -158,8 +164,6 @@ fn get_abs_path(opf_path: &str, item_href: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::chapter;
 
     use self::toc::{NavMap, NavPoint};
 

@@ -1,6 +1,6 @@
 use std::{fs, path::{Path, PathBuf}};
 
-use crate::error::Result;
+use crate::result::Result;
 use scraper::{Html, Selector};
 
 #[derive(Debug)]

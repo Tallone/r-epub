@@ -115,7 +115,7 @@ impl Opf {
 
     /// Get the book's cover href.
     pub fn cover_path(&self) -> Option<String> {
-        if let Some(first) = self.manifest.items.get(0) {
+        if let Some(first) = self.manifest.items.first() {
             if first.media_type.contains("image") {
                 return Some(first.href.clone());
             }
@@ -126,7 +126,7 @@ impl Opf {
 
     /// Get item by id
     pub fn get_item(&self, id: &str) -> Option<&Item> {
-        if let Some(item) = self.manifest.items.iter().find(|i| &i.id == id ) {
+        if let Some(item) = self.manifest.items.iter().find(|i| i.id == id ) {
             return Some(item);
         }
 

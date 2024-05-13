@@ -2,6 +2,10 @@
 name = "r-epub"
 version = "0.1.0"
 edition = "2021"
+authors = ["Tallone"]
+license = "MIT"
+repository = "https://github.com/Tallone/r-epub"
+description = "Library to support parse .epub file"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
