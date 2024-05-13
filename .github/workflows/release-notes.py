@@ -5,7 +5,6 @@ import re
 import pathlib
 import sys
 
-
 _STDIO = pathlib.Path("-")
 
 def main():
