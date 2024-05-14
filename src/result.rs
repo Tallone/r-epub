@@ -14,4 +14,7 @@ pub enum EpubError {
 
     #[error("Deserialize xml failed: {0}")]
     XmlDeserilize(#[from] quick_xml::DeError),
+
+    #[error("{0}")]
+    Other(String),
 }

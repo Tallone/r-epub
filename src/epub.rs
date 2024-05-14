@@ -1,26 +1,29 @@
 use std::{
-    fs,
-    io::{self, BufReader},
+    fs::{self, File},
+    io::BufReader,
     path::{Path, PathBuf},
 };
 
-use zip::ZipArchive;
-
-use crate::{chapter::Chapter, container::Container, opf, result::Result, toc, Epub};
+use crate::{
+    chapter::Chapter,
+    container::Container,
+    opf,
+    result::{EpubError, Result},
+    toc, Epub,
+};
 
 const ENTRY_FILE: &str = "META-INF/container.xml";
 
 pub struct EpubContainer {
-    folder: Option<PathBuf>,
+    folder_path: Option<PathBuf>,
     opf_path: PathBuf,
     opf: opf::Opf,
     toc: toc::Toc,
 }
 
 impl EpubContainer {
-    /// Parse epub info.
-    /// If an extract_path is provided, it will extract all files from the EPUB to that path.
-    pub fn parse<P: AsRef<Path>>(path: P, extract_path: Option<P>) -> Result<EpubContainer> {
+    /// Parse from epub file.
+    pub fn parse_epub<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file = fs::File::open(path)?;
         // Unzip epub
         let mut archive = zip::ZipArchive::new(file)?;
@@ -37,56 +40,50 @@ impl EpubContainer {
         let toc_file = archive.by_name(&toc_path)?;
         let toc: toc::Toc = quick_xml::de::from_reader(BufReader::new(toc_file))?;
 
-        // extract
-        if let Some(dest_path) = &extract_path {
-            Self::extract(&mut archive, dest_path)?;
-        }
-
         Ok(Self {
-            folder: extract_path.map(|f| f.as_ref().to_path_buf()),
+            folder_path: None,
             opf_path: Path::new(&opf_path).to_path_buf(),
             opf,
             toc,
         })
     }
 
-    fn extract<P: AsRef<Path>>(archive: &mut ZipArchive<fs::File>, path: P) -> Result<()> {
-        let root = path.as_ref().to_path_buf();
-        if !root.exists() {
-            fs::create_dir_all(&root)?;
+    /// Parsing the META-INF/container.xml File from already unzipped EPUB
+    pub fn parse_container<P: AsRef<Path>>(container_path: P) -> Result<Self> {
+        let ct_path = container_path.as_ref();
+        if ct_path.is_dir() || !ct_path.exists() || ct_path.is_relative() {
+            return Err(EpubError::Other(
+                "Container path should be an absoluted .xml file path".to_owned(),
+            ));
         }
 
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            let outpath = match file.enclosed_name() {
-                Some(path) => root.join(path),
-                None => continue,
-            };
-
-            if file.is_dir() {
-                fs::create_dir_all(&outpath)?;
-            } else {
-                if let Some(p) = outpath.parent() {
-                    if !p.exists() {
-                        fs::create_dir_all(p)?;
-                    }
-                }
-                let mut outfile = fs::File::create(&outpath)?;
-                io::copy(&mut file, &mut outfile)?;
-            }
-
-            // Get and Set permissions
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-
-                if let Some(mode) = file.unix_mode() {
-                    fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))?;
-                }
-            }
+        let root_path = ct_path.parent().and_then(|p| p.parent());
+        if root_path.is_none() {
+            return Err(EpubError::Other(
+                "Container path should be in an META-INFO folder".to_owned(),
+            ));
         }
+        let root_path = root_path.unwrap();
 
-        Ok(())
+        let container_file = File::open(&container_path)?;
+        let container: Container = quick_xml::de::from_reader(BufReader::new(container_file))?;
+
+        // Parse opf
+        let opf_path = container.rootfiles.rootfile.full_path;
+        let opf_file = File::open(root_path.join(&opf_path))?;
+        let opf: opf::Opf = quick_xml::de::from_reader(BufReader::new(opf_file))?;
+
+        // Parse toc
+        let toc_path = get_abs_path(&opf_path, &opf.toc_path());
+        let toc_file = File::open(root_path.join(toc_path))?;
+        let toc: toc::Toc = quick_xml::de::from_reader(BufReader::new(toc_file))?;
+
+        Ok(Self {
+            folder_path: Some(root_path.to_path_buf()),
+            opf_path: Path::new(&opf_path).to_path_buf(),
+            opf,
+            toc,
+        })
     }
 }
 
@@ -105,10 +102,9 @@ impl Epub for EpubContainer {
         &self.toc
     }
 
-    /// Extract epub before using this method
     fn get_chapter(&self, index: usize) -> Option<Chapter> {
         let items = &self.opf.spine.itemrefs;
-        if let Some(folder) = &self.folder {
+        if let Some(folder) = &self.folder_path {
             if let Some(item) = items.get(index - 1) {
                 let id = &item.id_ref;
                 if let Some(manifest) = self.opf.get_item(id) {
@@ -125,6 +121,16 @@ impl Epub for EpubContainer {
         }
 
         None
+    }
+
+    fn chapters(&self) -> Vec<Chapter> {
+        let mut ret = Vec::new();
+        for i in 0..self.opf.spine.itemrefs.len() {
+            if let Some(ch) = self.get_chapter(i + 1) {
+                ret.push(ch);
+            }
+        }
+        ret
     }
 }
 
@@ -166,6 +172,8 @@ fn get_abs_path<P: AsRef<Path>>(opf_path: P, item_href: P) -> PathBuf {
 #[cfg(test)]
 mod tests {
 
+    use std::env;
+
     use self::toc::{NavMap, NavPoint};
 
     use super::*;
@@ -196,7 +204,7 @@ mod tests {
     #[test]
     fn parse() {
         let path = "demo.epub";
-        let epub = EpubContainer::parse(path, None).unwrap();
+        let epub = EpubContainer::parse_epub(path).unwrap();
 
         print_nav_map(&epub.toc.nav_map, epub.toc.depth());
     }
@@ -225,9 +233,10 @@ mod tests {
 
     #[test]
     fn get_chapter() {
-        let path = "demo.epub";
-        let extract_path = Some("target/demo");
-        let epub = EpubContainer::parse(path, extract_path).unwrap();
+        let path = "target/demo/META-INF/container.xml";
+        let cur_path = env::current_dir().unwrap();
+
+        let epub = EpubContainer::parse_container(cur_path.join(path)).unwrap();
         let ch = epub.get_chapter(2).unwrap();
         println!("ch: {:?}", ch);
     }

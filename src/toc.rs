@@ -33,11 +33,18 @@ pub struct NavPoint {
     pub nav_lable: NavLabel,
     #[serde(rename = "navPoint", default)]
     pub sub_navpoints: Vec<NavPoint>,
+    pub content: Content,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NavLabel {
     pub text: Text,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Content {
+    #[serde[rename = "@src"]]
+    pub src: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
