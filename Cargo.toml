@@ -1,6 +1,6 @@
 [package]
 name = "r-epub"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Tallone"]
 license = "MIT"
@@ -14,4 +14,7 @@ quick-xml = { version = "0.31.0", features = ["serialize", "overlapped-lists"] }
 scraper = "0.19.0"
 serde = { version = "1.0.201", features = ["derive"] }
 thiserror = "1.0.60"
-zip = {version = "1.2.2", default-features = false, features = ["deflate", "deflate64"] }
+zip = { version = "1.2.2", default-features = false, features = [
+  "deflate",
+  "deflate64",
+] }
