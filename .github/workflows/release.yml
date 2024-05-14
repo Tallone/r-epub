@@ -31,6 +31,10 @@ jobs:
       run: cargo publish --token ${CRATES_TOKEN}
       env:
         CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+    - name: List workflow files
+      shell: bash
+      run: |
+        ls -l .github/workflows/
     - name: Generate Release Notes
       run: |
         ./.github/workflows/release-notes.py --tag ${{ env.RELEASE_VERSION }} --output notes-${{ env.RELEASE_VERSION }}.md
