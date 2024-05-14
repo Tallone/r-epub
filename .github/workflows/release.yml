@@ -28,6 +28,7 @@ jobs:
       with:
         fetch-depth: 1
     - name: Publish to crates.io
+      continue-on-error: true
       run: cargo publish --token ${CRATES_TOKEN}
       env:
         CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
