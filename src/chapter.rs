@@ -5,8 +5,9 @@ use std::{
 
 use crate::result::Result;
 use scraper::{Html, Selector};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Chapter {
     pub index: usize,
     pub title: String,
